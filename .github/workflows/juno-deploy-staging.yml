@@ -1,0 +1,53 @@
+name: Deploy to Juno (Staging)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: juno-staging
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup project
+        uses: ./.github/actions/setup-project
+        with:
+          check-lockfile: 'true'
+
+      - name: Setup Juno CLI
+        run: npm install -g @junobuild/cli
+
+      - name: Configure Juno Environment
+        run: |
+          echo "JUNO_SATELLITE_ID=${{ secrets.JUNO_SATELLITE_ID_STAGING }}" >> $GITHUB_ENV
+          echo "JUNO_ENV=staging" >> $GITHUB_ENV
+
+      - name: Build for Juno (Staging)
+        run: npm run build:juno:staging --workspace=apps/ui
+        env:
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL_STAGING }}
+
+      - name: Deploy to Juno (Staging)
+        run: |
+          cd apps/ui
+          npx juno deploy --target staging
+        env:
+          JUNO_TOKEN: ${{ secrets.JUNO_TOKEN }}
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "✅ Successfully deployed to Juno Staging"
+          echo "Satellite ID: ${{ secrets.JUNO_SATELLITE_ID_STAGING }}"
+          echo "URL: https://${{ secrets.JUNO_SATELLITE_ID_STAGING }}.icp0.io"

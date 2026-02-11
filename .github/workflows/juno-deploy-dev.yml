@@ -1,0 +1,63 @@
+name: Deploy to Juno (Development)
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: juno-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup project
+        uses: ./.github/actions/setup-project
+        with:
+          check-lockfile: 'true'
+
+      - name: Setup Juno CLI
+        run: npm install -g @junobuild/cli
+
+      - name: Configure Juno Environment
+        run: |
+          echo "JUNO_SATELLITE_ID=${{ secrets.JUNO_SATELLITE_ID_DEV }}" >> $GITHUB_ENV
+          echo "JUNO_ENV=development" >> $GITHUB_ENV
+
+      - name: Build for Juno (Development)
+        run: npm run build:juno:dev --workspace=apps/ui
+        env:
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL_DEV || 'http://localhost:3008' }}
+
+      - name: Deploy to Juno (Development)
+        run: |
+          cd apps/ui
+          npx juno deploy --target development
+        env:
+          JUNO_TOKEN: ${{ secrets.JUNO_TOKEN }}
+
+      - name: Comment PR with deployment URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const satelliteId = '${{ secrets.JUNO_SATELLITE_ID_DEV }}';
+            const url = satelliteId 
+              ? `https://${satelliteId}.icp0.io`
+              : 'Deployment URL not available';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Juno Development Deployment**\n\nPreview URL: ${url}\nEnvironment: development\nSatellite ID: ${satelliteId}`
+            });
