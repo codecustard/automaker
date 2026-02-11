@@ -170,7 +170,7 @@ app.use(
 );
 // CORS configuration
 // When using credentials (cookies), origin cannot be '*'
-// We dynamically allow the requesting origin for local development
+// We dynamically allow the requesting origin for local development and ICP domains
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -182,6 +182,7 @@ app.use(
 
       // If CORS_ORIGIN is set, use it (can be comma-separated list)
       const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
+
       if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins[0] !== '*') {
         if (allowedOrigins.includes(origin)) {
           callback(null, origin);
@@ -192,6 +193,7 @@ app.use(
       }
 
       // For local development, allow all localhost/loopback origins (any port)
+      // Also allow ICP domains for Juno deployment
       try {
         const url = new URL(origin);
         const hostname = url.hostname;
@@ -203,7 +205,9 @@ app.use(
           hostname === '0.0.0.0' ||
           hostname.startsWith('192.168.') ||
           hostname.startsWith('10.') ||
-          hostname.startsWith('172.')
+          hostname.startsWith('172.') ||
+          hostname.endsWith('.icp0.io') ||
+          hostname.endsWith('.ic0.app')
         ) {
           callback(null, origin);
           return;
